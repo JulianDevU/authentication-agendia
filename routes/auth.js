@@ -33,47 +33,60 @@ const changePasswordValidation = [
 
 const registerValidation = [
   body('email').isEmail().normalizeEmail(),
-  body('password').isLength({ min: 6 }).withMessage('La contraseña debe tener al menos 6 caracteres')
+  body('name').notEmpty(),
+  body('phone').notEmpty(),
+  body('city').notEmpty(),
+  body('password').isLength({ min: 6 }).withMessage('La contraseña debe tener al menos 6 caracteres'),
+  body('password').matches(/\d/).withMessage('La contraseña debe contener al menos un número'),
+  body('password').matches(/[A-Z]/).withMessage('La contraseña debe contener al menos una letra mayúscula'),
+  body('password').matches(/[a-z]/).withMessage('La contraseña debe contener al menos una letra minúscula')
 ];
+
+// =========================
+// BORRAR CUENTA
+// =========================
+router.delete('/delete-account', authenticateToken, async (req, res) => {
+  try {
+    await pool.query('DELETE FROM users WHERE id = $1', [req.user.userId]);
+    res.json({ message: 'Cuenta eliminada exitosamente' });
+  } catch (err) {
+    console.error('Error al eliminar cuenta:', err);
+    res.status(500).json({ error: 'Error al eliminar la cuenta' });
+  }
+});
 
 // =========================
 // REGISTRO NORMAL
 // =========================
 router.post('/register', registerValidation, async (req, res) => {
   const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return res.status(400).json({ errors: errors.array() });
-  }
+  if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
-  const { email, password } = req.body;
+  const { email, password, name, last_name, phone, city, birthdate } = req.body;
 
   try {
     const existingUser = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
-    if (existingUser.rows.length > 0) {
+    if (existingUser.rows.length > 0)
       return res.status(400).json({ error: 'El correo ya está registrado' });
-    }
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const result = await pool.query(
-      `INSERT INTO users (email, password_hash)
-       VALUES ($1, $2)
-       RETURNING id, email`,
-      [email, hashedPassword]
+      `INSERT INTO users (email, password_hash, name, phone, city, birthdate)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING id, email, name, phone, city, birthdate, role`,
+      [email, hashedPassword, name, phone, city, birthdate]
     );
 
     const user = result.rows[0];
+
     const accessToken = generateAccessToken(user.id, user.email);
     const refreshToken = generateRefreshToken(user.id);
 
     await pool.query('UPDATE users SET refresh_token = $1 WHERE id = $2', [refreshToken, user.id]);
 
-    res.status(201).json({
-      message: 'Usuario registrado exitosamente',
-      user,
-      accessToken,
-      refreshToken
-    });
+    res.status(201).json({ message: 'Usuario registrado exitosamente', user, accessToken, refreshToken });
+
   } catch (err) {
     console.error('Error en registro:', err);
     res.status(500).json({ error: 'Error al registrar usuario' });

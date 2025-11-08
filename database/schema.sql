@@ -4,8 +4,12 @@ CREATE TABLE users (
   password_hash VARCHAR(255),
   refresh_token TEXT,
   name VARCHAR(255),
+  phone VARCHAR(20),
+  city VARCHAR(100),
+  birthdate DATE,
   picture TEXT,
   provider VARCHAR(50) DEFAULT 'local',
+  role VARCHAR(50) DEFAULT 'user',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
